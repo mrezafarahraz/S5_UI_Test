@@ -1,0 +1,8 @@
+C:\users\user\S5_UI_Test\SADRA5.Monitor\obj\Debug\net6.0-windows\SADRA5.Monitor.csproj.AssemblyReference.cache
+C:\users\user\S5_UI_Test\SADRA5.Monitor\obj\Debug\net6.0-windows\App.g.cs
+C:\users\user\S5_UI_Test\SADRA5.Monitor\obj\Debug\net6.0-windows\SADRA5.Monitor_MarkupCompile.cache
+C:\users\user\S5_UI_Test\SADRA5.Monitor\obj\Debug\net6.0-windows\SADRA5.Monitor.GeneratedMSBuildEditorConfig.editorconfig
+C:\users\user\S5_UI_Test\SADRA5.Monitor\obj\Debug\net6.0-windows\SADRA5.Monitor.AssemblyInfoInputs.cache
+C:\users\user\S5_UI_Test\SADRA5.Monitor\obj\Debug\net6.0-windows\SADRA5.Monitor.AssemblyInfo.cs
+C:\users\user\S5_UI_Test\SADRA5.Monitor\obj\Debug\net6.0-windows\SADRA5.Monitor.csproj.CoreCompileInputs.cache
+C:\users\user\S5_UI_Test\SADRA5.Monitor\obj\Debug\net6.0-windows\SADRA5.Monitor.sourcelink.json
