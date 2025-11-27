@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "xiqWPPtFlvM=",
+  "dgSpecHash": "3a7M6EgBPw4=",
   "success": true,
-  "projectFilePath": "C:\\users\\user\\S5_UI_Test\\SADRA5.Monitor\\SADRA5.Monitor.csproj",
+  "projectFilePath": "E:\\Git\\S5_UI_Test\\S5_UI_Test\\SADRA5.Monitor\\SADRA5.Monitor.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\User\\.nuget\\packages\\livecharts\\0.9.7\\livecharts.0.9.7.nupkg.sha512",
     "C:\\Users\\User\\.nuget\\packages\\livecharts.wpf\\0.9.7\\livecharts.wpf.0.9.7.nupkg.sha512",

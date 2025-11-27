@@ -1,367 +1,229 @@
-<Window x:Class="SADRA5.Monitor.Views.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
-        Title="SADRA5 Monitor Pro" 
-        Height="800" Width="1200"
-        WindowStartupLocation="CenterScreen"
-        Background="#1E1E1E">
+using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+using System.Windows.Input;
+using LiveCharts;
+using SADRA5.Monitor.Models;
+using SADRA5.Monitor.Services;
 
-    <Window.Resources>
-        <!-- Card Style -->
-        <Style x:Key="CardStyle" TargetType="Border">
-            <Setter Property="Background" Value="#2D2D30"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="15"/>
-            <Setter Property="Margin" Value="5"/>
-        </Style>
+namespace SADRA5.Monitor.ViewModels
+{
+    public class MainViewModel : INotifyPropertyChanged
+    {
+        private SerialCommunication _serial;
+        private readonly DataLogger _dataLogger;
+        
+        private MonitoringData _currentData;
+        private bool _isConnected;
+        private string _connectionStatus;
+        private string _selectedPort;
 
-        <!-- Value Text Style -->
-        <Style x:Key="ValueTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="28"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="#00D9FF"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-        </Style>
+        public MonitoringData CurrentData
+        {
+            get => _currentData;
+            set { _currentData = value; OnPropertyChanged(); }
+        }
 
-        <!-- Label Style -->
-        <Style x:Key="LabelStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="#B0B0B0"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-        </Style>
+        public bool IsConnected
+        {
+            get => _isConnected;
+            set { _isConnected = value; OnPropertyChanged(); OnPropertyChanged(nameof(ConnectionButtonText)); }
+        }
 
-        <!-- Button Style -->
-        <Style x:Key="ButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#007ACC"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Padding" Value="15,8"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                CornerRadius="4"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#005A9E"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-    </Window.Resources>
+        public string ConnectionStatus
+        {
+            get => _connectionStatus;
+            set { _connectionStatus = value; OnPropertyChanged(); }
+        }
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        public string SelectedPort
+        {
+            get => _selectedPort;
+            set { _selectedPort = value; OnPropertyChanged(); }
+        }
 
-        <!-- Header -->
-        <Border Grid.Row="0" Background="#252526" Padding="15,10">
-            <Grid>
-                <StackPanel Orientation="Horizontal">
-                    <Ellipse Width="30" Height="30" Fill="#007ACC" Margin="0,0,10,0"/>
-                    <TextBlock Text="SADRA5 Monitor Pro" 
-                              FontSize="18" 
-                              FontWeight="Bold" 
-                              Foreground="White"
-                              VerticalAlignment="Center"/>
-                </StackPanel>
+        public string ConnectionButtonText => IsConnected ? "Disconnect" : "Connect";
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <TextBlock Text="COM Port:" Foreground="#B0B0B0" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <ComboBox Width="100" 
-                              ItemsSource="{Binding AvailablePorts}"
-                              SelectedItem="{Binding SelectedPort}"
-                              Margin="0,0,10,0"
-                              Height="25"/>
-                    
-                    <Button Content="{Binding ConnectionButtonText}"
-                            Command="{Binding ConnectCommand}"
-                            Style="{StaticResource ButtonStyle}"
-                            Width="100"/>
+        public ChartValues<double> IuChartValues { get; set; }
+        public ChartValues<double> IvChartValues { get; set; }
+        public ChartValues<double> IwChartValues { get; set; }
+        public ChartValues<double> VbusChartValues { get; set; }
+        public ChartValues<double> TempChartValues { get; set; }
 
-                    <Ellipse Margin="10,0,0,0" 
-                            Fill="{Binding CurrentData.StatusColor}"
-                            Width="12" Height="12"
-                            ToolTip="{Binding ConnectionStatus}"/>
-                </StackPanel>
-            </Grid>
-        </Border>
+        public ObservableCollection<string> AvailablePorts { get; set; }
+        public ObservableCollection<string> LogEntries { get; set; }
 
-        <!-- Main Content -->
-        <Grid Grid.Row="1" Margin="10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="350"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        public ICommand ConnectCommand { get; }
+        public ICommand ReadFaultLogCommand { get; }
+        public ICommand ClearFaultLogCommand { get; }
+        public ICommand ExportDataCommand { get; }
 
-            <!-- Left Panel -->
-            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
-                <StackPanel>
-                    
-                    <!-- Status Card -->
-                    <Border Style="{StaticResource CardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="SYSTEM STATUS" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
-                            
-                            <TextBlock Text="{Binding CurrentData.StatusText}"
-                                      FontSize="24"
-                                      FontWeight="Bold"
-                                      Foreground="{Binding CurrentData.StatusColor}"
-                                      HorizontalAlignment="Center"
-                                      Margin="0,5"/>
-                            
-                            <Border Height="1" Background="#3F3F46" Margin="0,10"/>
-                            
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Fault" Style="{StaticResource LabelStyle}"/>
-                                    <TextBlock Text="{Binding CurrentData.FaultCode, StringFormat=0x{0:X2}}"
-                                              FontSize="18"
-                                              Foreground="#FF6B6B"
-                                              HorizontalAlignment="Center"/>
-                                </StackPanel>
-                                
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Frequency" Style="{StaticResource LabelStyle}"/>
-                                    <TextBlock Text="{Binding CurrentData.Frequency, StringFormat={}{0:F1} Hz}"
-                                              FontSize="18"
-                                              Foreground="#4ECDC4"
-                                              HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Grid>
-                            
-                            <TextBlock Text="{Binding CurrentData.FaultText}"
-                                      Foreground="#FF6B6B"
-                                      HorizontalAlignment="Center"
-                                      Margin="0,8,0,0"
-                                      FontSize="10"/>
-                        </StackPanel>
-                    </Border>
+        public MainViewModel()
+        {
+            CurrentData = new MonitoringData();
+            AvailablePorts = new ObservableCollection<string>(System.IO.Ports.SerialPort.GetPortNames());
+            LogEntries = new ObservableCollection<string>();
 
-                    <!-- Current Card -->
-                    <Border Style="{StaticResource CardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="THREE-PHASE CURRENTS" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
-                            
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="U" Style="{StaticResource LabelStyle}"/>
-                                    <TextBlock Text="{Binding CurrentData.Iu, StringFormat={}{0:F1}}"
-                                              Style="{StaticResource ValueTextStyle}"/>
-                                    <TextBlock Text="A" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                                
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="V" Style="{StaticResource LabelStyle}"/>
-                                    <TextBlock Text="{Binding CurrentData.Iv, StringFormat={}{0:F1}}"
-                                              Style="{StaticResource ValueTextStyle}"/>
-                                    <TextBlock Text="A" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                                
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="W" Style="{StaticResource LabelStyle}"/>
-                                    <TextBlock Text="{Binding CurrentData.Iw, StringFormat={}{0:F1}}"
-                                              Style="{StaticResource ValueTextStyle}"/>
-                                    <TextBlock Text="A" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Grid>
-                            
-                            <Border Height="1" Background="#3F3F46" Margin="0,10"/>
-                            
-                            <StackPanel>
-                                <TextBlock Text="Average" Style="{StaticResource LabelStyle}"/>
-                                <TextBlock Text="{Binding CurrentData.Iavg, StringFormat={}{0:F1} A}"
-                                          FontSize="20"
-                                          FontWeight="Bold"
-                                          Foreground="#FFD93D"
-                                          HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
+            IuChartValues = new ChartValues<double>();
+            IvChartValues = new ChartValues<double>();
+            IwChartValues = new ChartValues<double>();
+            VbusChartValues = new ChartValues<double>();
+            TempChartValues = new ChartValues<double>();
 
-                    <!-- Voltage Card -->
-                    <Border Style="{StaticResource CardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="VOLTAGES" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
-                            
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="DC Bus" Style="{StaticResource LabelStyle}"/>
-                                    <TextBlock Text="{Binding CurrentData.Vbus, StringFormat={}{0:F0}}"
-                                              Style="{StaticResource ValueTextStyle}"
-                                              Foreground="#E74C3C"/>
-                                    <TextBlock Text="V" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                                
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="AC Out" Style="{StaticResource LabelStyle}"/>
-                                    <TextBlock Text="{Binding CurrentData.Vout, StringFormat={}{0:F0}}"
-                                              Style="{StaticResource ValueTextStyle}"
-                                              Foreground="#9B59B6"/>
-                                    <TextBlock Text="V" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
+            _dataLogger = new DataLogger();
 
-                    <!-- Temperature Card -->
-                    <Border Style="{StaticResource CardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="TEMPERATURE" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
-                            
-                            <TextBlock Text="{Binding CurrentData.Temperature, StringFormat={}{0:F1}}"
-                                      Style="{StaticResource ValueTextStyle}"
-                                      Foreground="#F39C12"/>
-                            
-                            <TextBlock Text="°C" FontSize="10" Foreground="#808080" HorizontalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
+            ConnectCommand = new RelayCommand(async () => await ToggleConnection());
+            ReadFaultLogCommand = new RelayCommand(async () => await ReadFaultLog());
+            ClearFaultLogCommand = new RelayCommand(async () => await ClearFaultLog());
+            ExportDataCommand = new RelayCommand(async () => await ExportData());
 
-                    <!-- Controls Card -->
-                    <Border Style="{StaticResource CardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="CONTROLS" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
-                            
-                            <Button Content="Read Fault Log"
-                                   Command="{Binding ReadFaultLogCommand}"
-                                   Style="{StaticResource ButtonStyle}"
-                                   Margin="0,3"/>
-                            
-                            <Button Content="Clear Fault Log"
-                                   Command="{Binding ClearFaultLogCommand}"
-                                   Style="{StaticResource ButtonStyle}"
-                                   Margin="0,3">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="#E74C3C" CornerRadius="4" Padding="15,8">
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
-                            
-                            <Button Content="Export Data"
-                                   Command="{Binding ExportDataCommand}"
-                                   Style="{StaticResource ButtonStyle}"
-                                   Margin="0,3">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="#27AE60" CornerRadius="4" Padding="15,8">
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
-                        </StackPanel>
-                    </Border>
+            ConnectionStatus = "Disconnected";
+            
+            if (AvailablePorts.Count > 0)
+                SelectedPort = AvailablePorts[0];
+        }
 
-                </StackPanel>
-            </ScrollViewer>
+        private async Task ToggleConnection()
+        {
+            if (!IsConnected)
+            {
+                if (string.IsNullOrEmpty(SelectedPort))
+                {
+                    AddLog("Please select a COM port");
+                    return;
+                }
 
-            <!-- Right Panel - Charts -->
-            <Grid Grid.Column="1" Margin="5,0,0,0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="200"/>
-                </Grid.RowDefinitions>
+                _serial = new SerialCommunication(SelectedPort);
+                _serial.DataReceived += OnDataReceived;
+                _serial.ErrorOccurred += OnError;
 
-                <!-- Current Chart -->
-                <Border Grid.Row="0" Style="{StaticResource CardStyle}">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="CURRENT TRENDS" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
-                        
-                        <lvc:CartesianChart DisableAnimations="True" Background="Transparent" Foreground="White">
-                            <lvc:CartesianChart.Series>
-                                <lvc:LineSeries Values="{Binding IuChartValues}" Title="U" Stroke="#00D9FF" Fill="Transparent" StrokeThickness="2" PointGeometrySize="0"/>
-                                <lvc:LineSeries Values="{Binding IvChartValues}" Title="V" Stroke="#FFD93D" Fill="Transparent" StrokeThickness="2" PointGeometrySize="0"/>
-                                <lvc:LineSeries Values="{Binding IwChartValues}" Title="W" Stroke="#FF6B6B" Fill="Transparent" StrokeThickness="2" PointGeometrySize="0"/>
-                            </lvc:CartesianChart.Series>
-                            <lvc:CartesianChart.AxisX>
-                                <lvc:Axis ShowLabels="False"/>
-                            </lvc:CartesianChart.AxisX>
-                            <lvc:CartesianChart.AxisY>
-                                <lvc:Axis Title="Current (A)" Foreground="White"/>
-                            </lvc:CartesianChart.AxisY>
-                        </lvc:CartesianChart>
-                    </DockPanel>
-                </Border>
+                bool success = await _serial.ConnectAsync();
+                
+                if (success)
+                {
+                    IsConnected = true;
+                    ConnectionStatus = $"Connected to {SelectedPort}";
+                    AddLog($"Connected to {SelectedPort}");
+                }
+                else
+                {
+                    AddLog("Connection failed");
+                }
+            }
+            else
+            {
+                await _serial.DisconnectAsync();
+                IsConnected = false;
+                ConnectionStatus = "Disconnected";
+                AddLog("Disconnected");
+            }
+        }
 
-                <!-- Voltage Chart -->
-                <Border Grid.Row="1" Style="{StaticResource CardStyle}">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="VOLTAGE & TEMPERATURE" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
-                        
-                        <lvc:CartesianChart DisableAnimations="True" Background="Transparent" Foreground="White">
-                            <lvc:CartesianChart.Series>
-                                <lvc:LineSeries Values="{Binding VbusChartValues}" Title="Vbus" Stroke="#E74C3C" Fill="Transparent" StrokeThickness="2" PointGeometrySize="0"/>
-                                <lvc:LineSeries Values="{Binding TempChartValues}" Title="Temp" Stroke="#F39C12" Fill="Transparent" StrokeThickness="2" PointGeometrySize="0" ScalesYAt="1"/>
-                            </lvc:CartesianChart.Series>
-                            <lvc:CartesianChart.AxisX>
-                                <lvc:Axis ShowLabels="False"/>
-                            </lvc:CartesianChart.AxisX>
-                            <lvc:CartesianChart.AxisY>
-                                <lvc:Axis Title="Voltage (V)" Foreground="White" Position="LeftBottom"/>
-                                <lvc:Axis Title="Temp (°C)" Foreground="White" Position="RightTop"/>
-                            </lvc:CartesianChart.AxisY>
-                        </lvc:CartesianChart>
-                    </DockPanel>
-                </Border>
+        private void OnDataReceived(object sender, MonitoringData data)
+        {
+            CurrentData = data;
 
-                <!-- Event Log -->
-                <Border Grid.Row="2" Style="{StaticResource CardStyle}">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="EVENT LOG" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
-                        
-                        <ListBox ItemsSource="{Binding LogEntries}"
-                                Background="#252526"
-                                Foreground="#B0B0B0"
-                                BorderThickness="0"
-                                FontFamily="Consolas"
-                                FontSize="10"/>
-                    </DockPanel>
-                </Border>
+            UpdateChart(IuChartValues, data.Iu);
+            UpdateChart(IvChartValues, data.Iv);
+            UpdateChart(IwChartValues, data.Iw);
+            UpdateChart(VbusChartValues, data.Vbus);
+            UpdateChart(TempChartValues, data.Temperature);
 
-            </Grid>
-        </Grid>
+            _dataLogger.LogData(data);
 
-        <!-- Footer -->
-        <Border Grid.Row="2" Background="#252526" Padding="10,8">
-            <Grid>
-                <TextBlock Text="{Binding ConnectionStatus}" Foreground="#B0B0B0" FontSize="11"/>
-                <TextBlock Text="© 2025 SADRA5 Monitor Pro | FaraabinCo" 
-                          HorizontalAlignment="Right"
-                          Foreground="#808080"
-                          FontSize="10"/>
-            </Grid>
-        </Border>
+            if (data.FaultCode != 0)
+            {
+                AddLog($"FAULT: {data.FaultText}");
+            }
+        }
 
-    </Grid>
-</Window>
+        private void UpdateChart(ChartValues<double> chart, double value)
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                chart.Add(value);
+                
+                if (chart.Count > 100)
+                    chart.RemoveAt(0);
+            });
+        }
+
+        private void OnError(object sender, string error)
+        {
+            AddLog($"ERROR: {error}");
+        }
+
+        private async Task ReadFaultLog()
+        {
+            if (!IsConnected) return;
+
+            var faultLog = await _serial.ReadFaultLogAsync();
+            
+            AddLog("=== Fault Log ===");
+            for (int i = 0; i < faultLog.Length; i++)
+            {
+                if (faultLog[i] != 0)
+                {
+                    AddLog($"Entry {i + 1}: {FaultAnalyzer.GetFaultDescription(faultLog[i])}");
+                }
+            }
+        }
+
+        private async Task ClearFaultLog()
+        {
+            if (!IsConnected) return;
+
+            await _serial.ClearFaultLogAsync();
+            AddLog("Fault log cleared");
+        }
+
+        private async Task ExportData()
+        {
+            string filename = $"SADRA5_Log_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+            await _dataLogger.ExportToCsv(filename);
+            AddLog($"Data exported to {filename}");
+        }
+
+        private void AddLog(string message)
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                LogEntries.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {message}");
+                
+                if (LogEntries.Count > 100)
+                    LogEntries.RemoveAt(LogEntries.Count - 1);
+            });
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public class RelayCommand : ICommand
+    {
+        private readonly Func<Task> _execute;
+        private readonly Func<bool> _canExecute;
+
+        public RelayCommand(Func<Task> execute, Func<bool> canExecute = null)
+        {
+            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            _canExecute = canExecute;
+        }
+
+        public bool CanExecute(object parameter) => _canExecute?.Invoke() ?? true;
+
+        public async void Execute(object parameter) => await _execute();
+
+        public event EventHandler CanExecuteChanged
+        {
+            add => System.Windows.Input.CommandManager.RequerySuggested += value;
+            remove => System.Windows.Input.CommandManager.RequerySuggested -= value;
+        }
+    }
+}

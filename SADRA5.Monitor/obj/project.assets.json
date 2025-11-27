@@ -302,11 +302,11 @@
   "project": {
     "version": "2.0.0",
     "restore": {
-      "projectUniqueName": "C:\\users\\user\\S5_UI_Test\\SADRA5.Monitor\\SADRA5.Monitor.csproj",
+      "projectUniqueName": "E:\\Git\\S5_UI_Test\\S5_UI_Test\\SADRA5.Monitor\\SADRA5.Monitor.csproj",
       "projectName": "SADRA5.Monitor",
-      "projectPath": "C:\\users\\user\\S5_UI_Test\\SADRA5.Monitor\\SADRA5.Monitor.csproj",
+      "projectPath": "E:\\Git\\S5_UI_Test\\S5_UI_Test\\SADRA5.Monitor\\SADRA5.Monitor.csproj",
       "packagesPath": "C:\\Users\\User\\.nuget\\packages\\",
-      "outputPath": "C:\\users\\user\\S5_UI_Test\\SADRA5.Monitor\\obj\\",
+      "outputPath": "E:\\Git\\S5_UI_Test\\S5_UI_Test\\SADRA5.Monitor\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "E:\\Installed\\VsShared\\NuGetPackages"
